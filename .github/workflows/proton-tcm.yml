@@ -1,0 +1,105 @@
+name: Release Proton Experimental TCM
+
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [tcm-ci]
+    paths: ['tcm/**', '.github/workflows/proton-tcm.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proton-tcm-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      CHANNEL: ${{ vars.PROTON_CHANNEL || 'bleeding-edge' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Check scripts
+        run: |
+          python3 -m unittest discover -s tcm/tests
+          bash -n tcm/build.sh tcm/install.sh
+          bash tcm/tests/install.sh
+          case "$CHANNEL" in public|bleeding-edge) ;; *) exit 1 ;; esac
+
+      - name: Restore SteamCMD
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/proton-tcm/steamcmd
+          key: steamcmd-linux-v1
+
+      - name: Prepare SteamCMD
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends lib32gcc-s1 zstd
+          mkdir -p "$HOME/.cache/proton-tcm/steamcmd"
+          if [[ ! -f "$HOME/.cache/proton-tcm/steamcmd/steamcmd.sh" ]]; then
+            curl -fL --retry 3 https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar -xz -C "$HOME/.cache/proton-tcm/steamcmd"
+          fi
+
+      - name: Check Valve's published build
+        id: upstream
+        run: |
+          timeout 300 "$HOME/.cache/proton-tcm/steamcmd/steamcmd.sh" +login anonymous +app_info_update 1 +app_info_print 1493710 +quit > "$RUNNER_TEMP/appinfo.log" 2>&1
+          build_id=$(python3 tcm/metadata.py build-id "$RUNNER_TEMP/appinfo.log" "$CHANNEL")
+          tag="tcm-${CHANNEL}-${build_id}-${GITHUB_SHA:0:8}"
+          published=$(gh release view "$tag" --json isDraft --jq '.isDraft' 2>/dev/null || true)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "build_id=$build_id" >> "$GITHUB_OUTPUT"
+          echo "build=$([[ "$published" == false ]] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+          echo "Steam channel: $CHANNEL; build: $build_id; existing release: $published" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Download Valve Proton Experimental
+        if: steps.upstream.outputs.build == 'true'
+        env:
+          EXPECTED_BUILD: ${{ steps.upstream.outputs.build_id }}
+        run: |
+          timeout 1200 "$HOME/.cache/proton-tcm/steamcmd/steamcmd.sh" +force_install_dir "$RUNNER_TEMP/valve-proton" +login anonymous +app_update 1493710 -beta "$CHANNEL" validate +quit
+          installed=$(awk '$1 == "\"buildid\"" {gsub(/"/, "", $2); print $2}' "$RUNNER_TEMP/valve-proton/steamapps/appmanifest_1493710.acf")
+          [[ "$installed" == "$EXPECTED_BUILD" ]] || { echo 'Steam updated during download; retry on next poll.' >&2; exit 1; }
+
+      - name: Build patched networking DLLs and package
+        if: steps.upstream.outputs.build == 'true'
+        run: |
+          bash tcm/build.sh "$RUNNER_TEMP/valve-proton" "$RUNNER_TEMP/tcm-build" 2>&1 | tee "$RUNNER_TEMP/build.log"
+
+      - name: Publish complete release
+        if: steps.upstream.outputs.build == 'true'
+        env:
+          TAG: ${{ steps.upstream.outputs.tag }}
+          BUILD_ID: ${{ steps.upstream.outputs.build_id }}
+        run: |
+          {
+            printf 'Valve Proton Experimental, Steam channel `%s`, build `%s`, with the game-specific Motorfest networking workaround.\n\n' "$CHANNEL" "$BUILD_ID"
+            cat "$RUNNER_TEMP/tcm-build/release/TCM-BUILD.txt"
+            printf '\n[Installation, rollback and update instructions](https://github.com/%s/blob/%s/tcm/README.md).\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA"
+            printf '\nIncludes both x86 and x64 patched DLLs, matching Wine sources and SHA-256 checksums. Steam updates can overwrite a replacement installation.\n'
+          } > "$RUNNER_TEMP/notes.md"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Proton Experimental TCM ($CHANNEL, $BUILD_ID)" --notes-file "$RUNNER_TEMP/notes.md" --draft
+          fi
+          gh release upload "$TAG" "$RUNNER_TEMP/tcm-build/release/"* --clobber
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md" --draft=false --latest
+          echo "Released: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Show failure details
+        if: failure()
+        run: |
+          for log in "$RUNNER_TEMP/appinfo.log" "$RUNNER_TEMP/build.log"; do
+            if [[ -f "$log" ]]; then tail -80 "$log"; fi
+          done

@@ -1,0 +1,106 @@
+From 9e4b92d214581348e5f6e27e1679e8dbaddb6d53 Mon Sep 17 00:00:00 2001
+From: PhialsBasement <phial@phiality.com>
+Date: Thu, 27 Aug 2026 21:33:43 +1000
+Subject: [PATCH] ws2_32: HACK: Hold a BattlEye ack for The Crew Motorfest.
+
+The Crew Motorfest (appid 2698940) sends its BattlEye report through two
+send slots on a 100ms tick and drops whatever finds both busy, so above
+200ms round trip the same parts are lost on every retry and the server
+kicks the client at 210s. Holding the ack of the 94 byte control record
+sent before the report keeps one slot busy when the report starts, so the
+first round drops different parts than the retries and the report
+completes in two rounds.
+
+ValveSoftware/Proton#9119
+---
+ dlls/ws2_32/socket.c | 56 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+
+diff --git a/dlls/ws2_32/socket.c b/dlls/ws2_32/socket.c
+index 934e4fcb7d3a..c9d90ac14adc 100644
+--- a/dlls/ws2_32/socket.c
++++ b/dlls/ws2_32/socket.c
+@@ -974,6 +974,26 @@ static void WINAPI socket_apc( void *apc_user, IO_STATUS_BLOCK *io, ULONG reserv
+     func( NtStatusToWSAError( io->Status ), io->Information, (OVERLAPPED *)io, 0 );
+ }
+ 
++/* HACK: The Crew Motorfest resends its BattlEye report until
++ * kicked when the ack (62 bytes, byte 2 0xdb) of the record
++ * it sends first (94 bytes) is seen before fragment 0. */
++static SOCKET tcm_hold_socket;
++static ULONGLONG tcm_query_at, tcm_hold_until;
++
++static BOOL tcm_relay_peer( const struct sockaddr *addr, int len )
++{
++    static int enabled = -1;
++    const struct sockaddr_in *sin = (const struct sockaddr_in *)addr;
++
++    if (enabled < 0)
++    {
++        const char *s = getenv( "SteamGameId" );
++        enabled = s && !strcmp( s, "2698940" );
++    }
++    return enabled && addr && len >= sizeof(*sin) && sin->sin_family == AF_INET
++           && ntohs( sin->sin_port ) == 4000;
++}
++
+ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret_size, DWORD *flags,
+                           struct sockaddr *addr, int *addr_len, OVERLAPPED *overlapped,
+                           LPWSAOVERLAPPED_COMPLETION_ROUTINE completion, WSABUF *control )
+@@ -1008,6 +1028,23 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
+         apc = socket_apc;
+     }
+ 
++    if (!overlapped && s == tcm_hold_socket && !(*flags & MSG_PEEK))
++    {
++        unsigned char peek[64];
++        WSABUF peek_buf = { sizeof(peek), (char *)peek };
++        SOCKADDR_STORAGE peek_addr;
++        int peek_addr_len = sizeof(peek_addr);
++        DWORD peek_size, peek_flags = MSG_PEEK;
++
++        if (GetTickCount64() > tcm_hold_until) tcm_hold_socket = 0;
++        else if (!WS2_recv_base( s, &peek_buf, 1, &peek_size, &peek_flags, (struct sockaddr *)&peek_addr,
++                                 &peek_addr_len, NULL, NULL, NULL ) && peek_size == 62 && peek[2] == 0xdb)
++        {
++            SetLastError( WSAEWOULDBLOCK );
++            return -1;
++        }
++    }
++
+     params.control_ptr = u64_from_user_ptr(control);
+     params.addr_ptr = u64_from_user_ptr(addr);
+     params.addr_len_ptr = u64_from_user_ptr(addr_len);
+@@ -1025,6 +1062,8 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
+         status = piosb->Status;
+     }
+     if (!status && ret_size) *ret_size = piosb->Information;
++    if (!status && !overlapped && piosb->Information >= 1000 && addr_len && tcm_relay_peer( addr, *addr_len ))
++        tcm_query_at = GetTickCount64();
+     SetLastError( NtStatusToWSAError( status ) );
+     TRACE( "status %#lx.\n", status );
+     return status ? -1 : 0;
+@@ -1076,6 +1115,23 @@ static int WS2_sendto( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *ret
+         apc = socket_apc;
+     }
+ 
++    if (!overlapped && buffer_count == 1 && tcm_relay_peer( addr, addr_len ))
++    {
++        ULONGLONG now = GetTickCount64();
++
++        if (buffers[0].len == 94 && now - tcm_query_at < 1000)
++        {
++            tcm_hold_socket = s;
++            tcm_hold_until = now + 900;
++            WARN( "HACK: control record after a query, holding its ack.\n" );
++        }
++        else if (buffers[0].len >= 1000 && tcm_hold_socket)
++        {
++            tcm_hold_socket = 0;
++            WARN( "HACK: fragment 0 sent, ack released.\n" );
++        }
++    }
++
+     params.addr_ptr = u64_from_user_ptr( addr );
+     params.addr_len = addr_len;
+     params.ws_flags = flags;
