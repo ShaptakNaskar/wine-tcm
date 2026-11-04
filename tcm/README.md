@@ -1,4 +1,4 @@
-# Proton Experimental TCM
+# Proton Experimental TCM fix
 
 Current Valve Proton Experimental with PhialsBasement's [Motorfest workaround](https://github.com/PhialsBasement/wine-tcm/commit/9e4b92d214581348e5f6e27e1679e8dbaddb6d53) for [Proton issue 9119](https://github.com/ValveSoftware/Proton/issues/9119).
 The patch only activates for Steam game ID `2698940`. It changes the timing of a UDP acknowledgement on port 4000 to work around the game's dropped report fragments on high latency connections. It does not disable BattlEye.
@@ -9,26 +9,26 @@ The patch only activates for Steam game ID `2698940`. It changes the timing of a
 
 ```sh
 sha256sum -c SHA256SUMS
-tar --zstd -xf Proton-Experimental-TCM.tar.zst
+tar --zstd -xf Proton-Experimental-TCM-fix.tar.zst
 ```
 
 The GitHub Actions workflow checks Steam's actual Proton Experimental build ID every 15 minutes and publishes a release when it changes. It also builds on automation/patch changes and supports manual runs. It currently tracks the `bleeding-edge` Steam beta, matching the original workaround and this machine's channel. Set repository variable `PROTON_CHANNEL` to `public` to track regular Experimental instead. Each tag includes the channel, Steam build ID and automation revision.
 
 GitHub may delay scheduled jobs, and disables schedules in inactive public repositories after 60 days. Re-enable the workflow from Actions if that happens. Upstream patch conflicts or an unrecognized version fail the build without publishing a partial release. Scheduled runs retry on the next interval. A release is published only after the complete upload succeeds.
 
-## Replace Steam's Proton Experimental
+## Install the separate Steam compatibility tool
 
-Close Steam and games using Experimental, then:
+Close Steam and games using the custom tool, then:
 
 ```sh
-bash Proton-Experimental-TCM/install-tcm.sh Proton-Experimental-TCM
+bash Proton-Experimental-TCM-fix/install-tcm.sh Proton-Experimental-TCM-fix
 ```
 
-The installer replaces `~/.steam/root/steamapps/common/Proton - Experimental` and preserves `user_settings.py`. Pass your installation directory as a second argument for another Steam library. It updates Steam's manifest to the downloaded Valve base while retaining your account and update preferences, and keeps timestamped backups of both the directory and manifest. Steam's **Proton Experimental** selection stays in place. It does not change any game prefixes or saves. With Steam closed, move the patched directory aside, rename the backup to `Proton - Experimental`, and copy the accompanying `.acf` backup over `steamapps/appmanifest_1493710.acf` to roll back.
+The installer creates `~/.steam/root/compatibilitytools.d/Proton-Experimental-TCM-fix`. Restart Steam, open the game's **Properties > Compatibility**, and choose **Proton Experimental TCM fix**. Valve's regular Proton Experimental installation remains separate, and its Steam updates cannot overwrite this custom tool. Pass another Steam client's `compatibilitytools.d` directory as a second argument if needed.
 
-Steam updates and file verification can overwrite the patch. Download and install a new release afterward. CI publishes releases; it does not automatically modify your PC.
+To update the custom tool, download a new release and rerun the installer. It preserves `user_settings.py` and moves the previous custom build to `~/.steam/root/proton-tcm-backups/`, outside Steam's tool discovery directory. To roll back, close Steam, move the current custom directory aside, and move a backup into its place. To uninstall, remove its directory from `compatibilitytools.d` and select another compatibility tool for the game.
 
-For a separate selectable tool instead, extract the directory into `~/.steam/root/compatibilitytools.d/`, restart Steam and choose **Proton Experimental TCM** for Motorfest.
+CI publishes releases automatically; installation of future custom builds on your PC remains manual. The installer leaves Steam's official app manifests and game prefixes alone.
 
 ## How the build works
 

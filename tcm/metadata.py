@@ -30,19 +30,6 @@ def read_vdf(text):
     return {quoted(name): object_body()}
 
 
-def write_vdf(data, indent=""):
-    def quote(text):
-        return '"' + text.replace('\\', '\\\\').replace('"', '\\"') + '"'
-
-    lines = []
-    for key, value in data.items():
-        if isinstance(value, dict):
-            lines.extend([indent + quote(key), indent + "{", write_vdf(value, indent + "\t"), indent + "}"])
-        else:
-            lines.append(indent + quote(key) + "\t\t" + quote(value))
-    return "\n".join(lines)
-
-
 def build_id(text, channel):
     start = re.search(r'^\s*"1493710"\s*$', text, re.MULTILINE)
     if not start:
@@ -60,17 +47,6 @@ def revisions(text):
     return match.group(2), match.group(3)
 
 
-def sync_manifest(original, downloaded):
-    current = read_vdf(original)
-    previous, latest = current["AppState"], read_vdf(downloaded)["AppState"]
-    if previous["appid"] != "1493710" or latest["appid"] != "1493710":
-        raise ValueError("Expected Proton Experimental app manifests")
-    for key in ("buildid", "LastUpdated", "SizeOnDisk", "InstalledDepots", "StateFlags", "StagingSize", "UpdateResult", "UserConfig", "MountedConfig"):
-        previous[key] = latest[key]
-    previous["TargetBuildID"] = latest["buildid"]
-    return write_vdf(current) + "\n"
-
-
 if __name__ == "__main__":
     mode, filename, *args = sys.argv[1:]
     content = Path(filename).read_text()
@@ -78,7 +54,5 @@ if __name__ == "__main__":
         print(build_id(content, args[0]))
     elif mode == "revisions":
         print(*revisions(content))
-    elif mode == "sync-manifest":
-        print(sync_manifest(content, Path(args[0]).read_text()), end="")
     else:
         raise SystemExit("Expected build-id or revisions")

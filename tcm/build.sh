@@ -31,7 +31,7 @@ docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e CCACHE_DISABLE=1 -v "
         "${arch/i386/i686}-w64-mingw32-strip" "dlls/ws2_32/$arch-windows/ws2_32.dll"
     done
 '
-stage="$output/Proton-Experimental-TCM"
+stage="$output/Proton-Experimental-TCM-fix"
 cp -a "$base" "$stage"
 rm -rf -- "$stage/steamapps"
 for arch in i386 x86_64; do
@@ -48,10 +48,10 @@ cat > "$stage/compatibilitytool.vdf" <<'VDF'
 {
   "compat_tools"
   {
-    "proton_experimental_tcm"
+    "proton_experimental_tcm_fix"
     {
       "install_path" "."
-      "display_name" "Proton Experimental TCM"
+      "display_name" "Proton Experimental TCM fix"
       "from_oslist" "windows"
       "to_oslist" "linux"
     }
@@ -62,11 +62,9 @@ printf 'Valve Proton: %s\nValve Wine: %s\nTCM patch: %s\nSDK: %s\nSDK digest: %s
     "$proton_sha" "$wine_sha" 9e4b92d214581348e5f6e27e1679e8dbaddb6d53 "$sdk" \
     "$(docker image inspect "$sdk" --format '{{index .RepoDigests 0}}')" "$(cat "$base/version")" > "$stage/TCM-BUILD.txt"
 cp "$root/tcm/install.sh" "$stage/install-tcm.sh"
-cp "$root/tcm/metadata.py" "$stage/tcm-metadata.py"
-cp "$base/steamapps/appmanifest_1493710.acf" "$stage/TCM-STEAM-MANIFEST.acf"
 cp "$root/tcm/README.md" "$stage/README-TCM.md"
 cp "$stage/TCM-BUILD.txt" "$output/release/"
-tar -I 'zstd -T0 -6' -cf "$output/release/Proton-Experimental-TCM.tar.zst" -C "$output" Proton-Experimental-TCM
+tar -I 'zstd -T0 -6' -cf "$output/release/Proton-Experimental-TCM-fix.tar.zst" -C "$output" Proton-Experimental-TCM-fix
 # Ship the matching patched LGPL Wine source with every binary release.
 tar -I 'zstd -T0 -6' -cf "$output/release/wine-tcm-source.tar.zst" -C "$output" wine 0001-motorfest-ack.patch Proton-Makefile.in
 (cd "$output/release" && sha256sum ./*.tar.zst > SHA256SUMS)

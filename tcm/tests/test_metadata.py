@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from metadata import build_id, revisions, read_vdf, write_vdf, sync_manifest
+from metadata import build_id, revisions
 
 
 class MetadataTests(unittest.TestCase):
@@ -29,18 +29,6 @@ Steam quit output'''
         self.assertEqual(revisions("123 experimental-11.0-20261101-pabcdef-w012345-d987654-x86_64\n"), ("abcdef", "012345"))
         with self.assertRaises(ValueError):
             revisions("unknown version")
-
-    def test_manifest_preserves_owner_and_preferences(self):
-        original = {"AppState": {"appid": "1493710", "buildid": "1", "LastOwner": "7656119", "AutoUpdateBehavior": "0"}}
-        latest = {"AppState": {"appid": "1493710", "buildid": "2", "LastOwner": "0", "LastUpdated": "123", "SizeOnDisk": "456", "InstalledDepots": {"1493711": {"manifest": "987"}}, "StateFlags": "4", "StagingSize": "0", "UpdateResult": "0", "UserConfig": {"BetaKey": "bleeding-edge"}, "MountedConfig": {"BetaKey": "bleeding-edge"}}}
-        result = read_vdf(sync_manifest(write_vdf(original), write_vdf(latest)))["AppState"]
-        self.assertEqual(result["buildid"], "2")
-        self.assertEqual(result["InstalledDepots"], latest["AppState"]["InstalledDepots"])
-        self.assertEqual(result["LastOwner"], "7656119")
-        self.assertEqual(result["AutoUpdateBehavior"], "0")
-        escaped = {"root": {"path": 'C:\\test\\"quoted"', "brace": "{"}}
-        self.assertEqual(read_vdf(write_vdf(escaped)), escaped)
-
 
 if __name__ == "__main__":
     unittest.main()

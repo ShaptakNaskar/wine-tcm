@@ -1,4 +1,4 @@
-name: Release Proton Experimental TCM
+name: Release Proton Experimental TCM fix
 
 on:
   schedule:
@@ -88,10 +88,10 @@ jobs:
             printf 'Valve Proton Experimental, Steam channel `%s`, build `%s`, with the game-specific Motorfest networking workaround.\n\n' "$CHANNEL" "$BUILD_ID"
             cat "$RUNNER_TEMP/tcm-build/release/TCM-BUILD.txt"
             printf '\n[Installation, rollback and update instructions](https://github.com/%s/blob/%s/tcm/README.md).\n' "$GITHUB_REPOSITORY" "$GITHUB_SHA"
-            printf '\nIncludes both x86 and x64 patched DLLs, matching Wine sources and SHA-256 checksums. Steam updates can overwrite a replacement installation.\n'
+            printf '\nInstall as the separate Steam tool **Proton Experimental TCM fix**. Includes x86 and x64 patched DLLs, matching Wine sources and SHA-256 checksums. Valve Experimental updates do not overwrite this custom tool.\n'
           } > "$RUNNER_TEMP/notes.md"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --title "Proton Experimental TCM ($CHANNEL, $BUILD_ID)" --notes-file "$RUNNER_TEMP/notes.md" --draft
+            gh release create "$TAG" --target "$GITHUB_SHA" --title "Proton Experimental TCM fix ($CHANNEL, $BUILD_ID)" --notes-file "$RUNNER_TEMP/notes.md" --draft
           fi
           gh release upload "$TAG" "$RUNNER_TEMP/tcm-build/release/"* --clobber
           gh release edit "$TAG" --notes-file "$RUNNER_TEMP/notes.md" --draft=false --latest
