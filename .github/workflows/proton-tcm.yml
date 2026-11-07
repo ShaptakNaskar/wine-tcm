@@ -19,6 +19,9 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
     permissions:
       contents: write
     env:
@@ -33,7 +36,7 @@ jobs:
       - name: Check scripts
         run: |
           python3 -m unittest discover -s tcm/tests
-          bash -n tcm/build.sh tcm/install.sh
+          bash -n tcm/build.sh tcm/install.sh tcm/resolve-commit.sh
           bash tcm/tests/install.sh
           case "$CHANNEL" in public|bleeding-edge) ;; *) exit 1 ;; esac
 

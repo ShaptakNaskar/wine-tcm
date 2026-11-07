@@ -7,8 +7,8 @@ output=$(realpath -m "${2:?Missing output directory}")
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 [[ -f "$base/proton" && -f "$base/version" && ! -e "$output" ]]
 read -r proton_short wine_short < <(python3 "$root/tcm/metadata.py" revisions "$base/version")
-proton_sha=$(gh api "repos/ValveSoftware/Proton/commits/$proton_short" --jq .sha)
-wine_sha=$(gh api "repos/ValveSoftware/wine/commits/$wine_short" --jq .sha)
+proton_sha=$(bash "$root/tcm/resolve-commit.sh" ValveSoftware/Proton "$proton_short")
+wine_sha=$(bash "$root/tcm/resolve-commit.sh" ValveSoftware/wine "$wine_short")
 # Valve builds components independently; the embedded Wine revision is authoritative.
 mkdir -p "$output/wine" "$output/obj" "$output/release"
 gh api "repos/ValveSoftware/Proton/contents/Makefile.in?ref=$proton_sha" --jq .content | base64 -d > "$output/Proton-Makefile.in"

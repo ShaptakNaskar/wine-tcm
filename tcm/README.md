@@ -33,7 +33,7 @@ CI publishes releases automatically; installation of future custom builds on you
 ## How the build works
 
 1. Download Valve's unmodified Linux x86_64 Proton Experimental depot anonymously using SteamCMD.
-2. Resolve the exact Proton and Wine revisions embedded in its `version` file. Valve builds the components independently, so the embedded Wine revision takes precedence over the main source commit's submodule pointer.
+2. Resolve the exact Proton and Wine revisions embedded in its `version` file. If GitHub cannot resolve an abbreviated hash, search the latest 100 bleeding-edge commits for a unique full hash; missing or ambiguous matches fail the build. Valve builds the components independently, so the embedded Wine revision takes precedence over the main source commit's submodule pointer.
 3. Apply the original, pinned patch. Build only the 32-bit and 64-bit `ws2_32.dll` with the SDK named by that exact Proton revision. The Unix networking library and all other components remain Valve's binaries.
 4. Check both DLLs for the workaround, package the complete tool, and publish SHA-256 checksums, build provenance and matching patched Wine sources. Existing files from other Proton versions are never used to make a release.
 
