@@ -43,7 +43,7 @@ systemctl --user enable --now proton-tcm-update.timer
 systemctl --user start proton-tcm-update.service
 ```
 
-The timer checks the latest published release hourly and catches up after login. It downloads only a new release tag, verifies its SHA-256 checksum, and reuses the installer. If Steam or this tool is running, it defers the update until a later check; it never closes Steam or interrupts a game. The Steam entry remains **Proton Experimental TCM fix**.
+The timer checks the latest published release daily and catches up after login. It downloads only a new release tag, verifies its SHA-256 checksum, and reuses the installer. If Steam or this tool is running, it defers the update until a later check; it never closes Steam or interrupts a game. The Steam entry remains **Proton Experimental TCM fix**.
 
 One automatically created previous build is retained in `~/.steam/root/proton-tcm-backups/`; older automatic backups are removed to prevent disk growth. Existing manual backups are retained. Check activity with `journalctl --user -u proton-tcm-update.service` and the next check with `systemctl --user list-timers proton-tcm-update.timer`. Disable automatic checks with `systemctl --user disable --now proton-tcm-update.timer`.
 

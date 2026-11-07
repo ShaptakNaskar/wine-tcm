@@ -1,8 +1,8 @@
 [Unit]
-Description=Check for Proton Experimental TCM fix updates hourly
+Description=Check for Proton Experimental TCM fix updates daily
 
 [Timer]
-OnCalendar=hourly
+OnCalendar=daily
 Persistent=true
 RandomizedDelaySec=2min
 
