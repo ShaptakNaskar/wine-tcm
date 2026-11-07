@@ -93,6 +93,12 @@ else:
         self.assertFalse((self.directory / "requests").exists())
         self.assertEqual((self.target / "version").read_text(), "old")
 
+    def test_checksum_for_another_file_does_not_authorize_installation(self):
+        (self.directory / "SHA256SUMS").write_text("0" * 64 + "  /unrelated-file\n")
+        result = self.update()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual((self.target / "version").read_text(), "old")
+
     def test_invalid_tag_is_rejected(self):
         self.environment["TEST_TAG"] = "../../invalid"
         result = self.update()

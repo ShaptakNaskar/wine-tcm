@@ -27,8 +27,8 @@ for asset in Proton-Experimental-TCM-fix.tar.zst SHA256SUMS; do
     curl -fL --retry 3 --connect-timeout 15 --max-time 900 \
         "https://github.com/ShaptakNaskar/wine-tcm/releases/download/$tag/$asset" -o "$work/$asset"
 done
-(cd "$work" && sha256sum -c SHA256SUMS --ignore-missing)
-tar --zstd --no-same-owner --no-same-permissions -xf "$work/Proton-Experimental-TCM-fix.tar.zst" -C "$work"
+(cd "$work" && awk '$2 == "./Proton-Experimental-TCM-fix.tar.zst" || $2 == "Proton-Experimental-TCM-fix.tar.zst"' SHA256SUMS | sha256sum -c -)
+tar --zstd --no-same-owner --no-same-permissions -xf "$work/Proton-Experimental-TCM-fix.tar.zst" -C "$work" -- Proton-Experimental-TCM-fix
 if [[ -d "$target" ]]; then touch "$target/.tcm-auto-backup"; fi
 bash "$root/install.sh" "$work/Proton-Experimental-TCM-fix" "$tools_dir"
 printf '%s\n' "$tag" > "$target/.tcm-release"
