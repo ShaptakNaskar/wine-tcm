@@ -33,13 +33,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Check scripts
-        run: |
-          python3 -m unittest discover -s tcm/tests
-          bash -n tcm/build.sh tcm/install.sh tcm/resolve-commit.sh
-          bash tcm/tests/install.sh
-          case "$CHANNEL" in public|bleeding-edge) ;; *) exit 1 ;; esac
-
       - name: Restore SteamCMD
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -54,6 +47,13 @@ jobs:
           if [[ ! -f "$HOME/.cache/proton-tcm/steamcmd/steamcmd.sh" ]]; then
             curl -fL --retry 3 https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz | tar -xz -C "$HOME/.cache/proton-tcm/steamcmd"
           fi
+
+      - name: Check scripts
+        run: |
+          python3 -m unittest discover -s tcm/tests
+          bash -n tcm/build.sh tcm/install.sh tcm/resolve-commit.sh tcm/update.sh
+          bash tcm/tests/install.sh
+          case "$CHANNEL" in public|bleeding-edge) ;; *) exit 1 ;; esac
 
       - name: Check Valve's published build
         id: upstream

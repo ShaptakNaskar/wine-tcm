@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for Proton Experimental TCM fix updates hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=2min
+
+[Install]
+WantedBy=timers.target

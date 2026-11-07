@@ -28,7 +28,26 @@ The installer creates `~/.steam/root/compatibilitytools.d/Proton-Experimental-TC
 
 To update the custom tool, download a new release and rerun the installer. It preserves `user_settings.py` and moves the previous custom build to `~/.steam/root/proton-tcm-backups/`, outside Steam's tool discovery directory. To roll back, close Steam, move the current custom directory aside, and move a backup into its place. To uninstall, remove its directory from `compatibilitytools.d` and select another compatibility tool for the game.
 
-CI publishes releases automatically; installation of future custom builds on your PC remains manual. The installer leaves Steam's official app manifests and game prefixes alone.
+The installer leaves Steam's official app manifests and game prefixes alone.
+
+## Automatic local updates
+
+ProtonPlus 0.6.8 uses a built-in provider catalog rather than accepting arbitrary repository URLs. This repository includes a user-level updater for the separate TCM tool. From a checkout of this repository:
+
+```sh
+mkdir -p ~/.local/lib/proton-tcm ~/.config/systemd/user
+cp tcm/update.sh tcm/install.sh ~/.local/lib/proton-tcm/
+cp tcm/proton-tcm-update.{service,timer} ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now proton-tcm-update.timer
+systemctl --user start proton-tcm-update.service
+```
+
+The timer checks the latest published release hourly and catches up after login. It downloads only a new release tag, verifies its SHA-256 checksum, and reuses the installer. If Steam or this tool is running, it defers the update until a later check; it never closes Steam or interrupts a game. The Steam entry remains **Proton Experimental TCM fix**.
+
+One automatically created previous build is retained in `~/.steam/root/proton-tcm-backups/`; older automatic backups are removed to prevent disk growth. Existing manual backups are retained. Check activity with `journalctl --user -u proton-tcm-update.service` and the next check with `systemctl --user list-timers proton-tcm-update.timer`. Disable automatic checks with `systemctl --user disable --now proton-tcm-update.timer`.
+
+The updater requires curl, Python 3, GNU tar, zstd, util-linux (`flock`), psmisc (`fuser`), and systemd user services. It uses public GitHub endpoints and needs no token. Updating these local helper scripts themselves requires copying them again from the repository.
 
 ## How the build works
 

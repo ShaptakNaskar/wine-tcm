@@ -1,0 +1,7 @@
+[Unit]
+Description=Update Proton Experimental TCM fix from GitHub releases
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash "%h/.local/lib/proton-tcm/update.sh"
+TimeoutStartSec=30min
